@@ -196,7 +196,7 @@ function LatticeApp() {
     };
 
     void load();
-    const timer = window.setInterval(load, 30000);
+    const timer = window.setInterval(load, 10000);
     return () => {
       active = false;
       controller?.abort();
@@ -1054,21 +1054,7 @@ function NodeCard({ node, selected, onClick }: { node: NodeItem; selected: boole
         </div>
         <StatusBadge status={node.status} />
       </header>
-      <div className="node-chart">
-        <ResponsiveContainer width="100%" height={54}>
-          <LineChart data={node.trend}>
-            <Line
-              type="monotone"
-              dataKey="cpu"
-              dot={false}
-              stroke={node.status === "offline" ? "#6f7777" : "#36d399"}
-              strokeWidth={2}
-              isAnimationActive={false}
-            />
-            <Line type="monotone" dataKey="net" dot={false} stroke="#5cc8ff" strokeWidth={2} isAnimationActive={false} />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
+      <NodeSparkline node={node} />
       <div className="node-spec-strip" aria-label="机器规格">
         <span>{node.specs.cores}</span>
         <span>{node.specs.memory}</span>
@@ -1084,6 +1070,34 @@ function NodeCard({ node, selected, onClick }: { node: NodeItem; selected: boole
         <strong>{node.ping ? `${node.ping} ms` : "timeout"}</strong>
       </footer>
     </button>
+  );
+}
+
+function NodeSparkline({ node }: { node: NodeItem }) {
+  if (node.trend.length < 2) {
+    return (
+      <div className="node-chart node-chart-waiting">
+        <span>等待更多采样</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="node-chart">
+      <ResponsiveContainer width="100%" height={54}>
+        <LineChart data={node.trend}>
+          <Line
+            type="monotone"
+            dataKey="cpu"
+            dot={false}
+            stroke={node.status === "offline" ? "#6f7777" : "#36d399"}
+            strokeWidth={2}
+            isAnimationActive={false}
+          />
+          <Line type="monotone" dataKey="net" dot={false} stroke="#5cc8ff" strokeWidth={2} isAnimationActive={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
   );
 }
 

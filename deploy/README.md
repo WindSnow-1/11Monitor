@@ -84,3 +84,34 @@ http://your-domain
 ```
 
 First login is `admin / admin123456` unless you changed `ADMIN_INITIAL_PASSWORD`.
+
+## 6. Install Local Agent
+
+Install this on the monitor server itself if you want the server to report its own CPU, memory, disk, traffic, and load every 10 seconds.
+
+Copy the agent service:
+
+```bash
+cp /opt/lattice-monitor/deploy/lattice-agent.service /etc/systemd/system/lattice-agent.service
+```
+
+Use the same token as the backend service:
+
+```bash
+TOKEN=$(grep '^Environment=AGENT_TOKEN=' /etc/systemd/system/lattice-backend.service | cut -d= -f3-)
+sed -i "s/change-this-token/$TOKEN/" /etc/systemd/system/lattice-agent.service
+```
+
+Start it:
+
+```bash
+systemctl daemon-reload
+systemctl enable --now lattice-agent
+systemctl status lattice-agent --no-pager
+```
+
+Watch one log page:
+
+```bash
+journalctl -u lattice-agent -n 20 --no-pager
+```

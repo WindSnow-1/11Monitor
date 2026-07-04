@@ -998,6 +998,21 @@ h2 {
   height: 54px;
 }
 
+.node-chart-waiting {
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  background:
+    linear-gradient(90deg, transparent, rgba(54, 211, 153, 0.08), transparent),
+    var(--panel-soft);
+  background-size: 220% 100%;
+  font-size: 12px;
+  font-weight: 800;
+  animation: waitingSweep 1.8s ease-in-out infinite;
+}
+
 .node-spec-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1052,6 +1067,7 @@ h2 {
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, var(--mint), var(--cyan));
+  transition: width 420ms ease;
 }
 
 .node-card footer {
@@ -1490,6 +1506,20 @@ h2 {
 .chart-tooltip span {
   color: var(--muted);
   font-size: 12px;
+}
+
+@keyframes waitingSweep {
+  0% {
+    background-position: 160% 0;
+  }
+
+  50% {
+    background-position: 40% 0;
+  }
+
+  100% {
+    background-position: -80% 0;
+  }
 }
 
 @media (max-width: 1180px) {

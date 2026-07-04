@@ -1,0 +1,26 @@
+[Unit]
+Description=Lattice Monitor Agent
+After=network-online.target lattice-backend.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/lattice-monitor
+Environment="LATTICE_API_URL=http://127.0.0.1:8091/api/agent/report"
+Environment="LATTICE_AGENT_TOKEN=change-this-token"
+Environment="LATTICE_AGENT_INTERVAL=10"
+Environment="LATTICE_NODE_ID=racknerd-a062afa"
+Environment="LATTICE_NODE_NAME=RackNerd RN"
+Environment="LATTICE_NODE_ROLE=主监控节点"
+Environment="LATTICE_NODE_REGION=Los Angeles"
+Environment="LATTICE_NODE_PROVIDER=RackNerd"
+Environment="LATTICE_NODE_IP=192.129.193.184"
+Environment="LATTICE_NODE_TAGS=rn,monitor,prod"
+ExecStart=/usr/bin/node /opt/lattice-monitor/agent/lattice-agent.mjs
+Restart=always
+RestartSec=3
+MemoryMax=96M
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
