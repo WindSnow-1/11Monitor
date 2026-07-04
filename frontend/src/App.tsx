@@ -316,6 +316,11 @@ function LatticeApp() {
     });
   }, [filter, query]);
 
+  const resetNodeFilters = () => {
+    setQuery("");
+    setFilter("all");
+  };
+
   if (authStatus === "checking") {
     return (
       <AuthShell theme={theme} onToggleTheme={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}>
@@ -482,6 +487,13 @@ function LatticeApp() {
                       onClick={() => setSelectedId(node.id)}
                     />
                   ))
+                ) : nodes.length ? (
+                  <EmptyState
+                    title="没有匹配节点"
+                    detail="当前搜索内容或状态筛选没有匹配到节点，清除筛选后会显示已有服务器。"
+                    actionLabel="清除筛选"
+                    onAction={resetNodeFilters}
+                  />
                 ) : (
                   <EmptyState title="暂无节点" detail="部署 Agent 后，真实服务器会自动出现在这里。" />
                 )}
@@ -1160,12 +1172,27 @@ function MachineSpecs({ node }: { node: NodeItem }) {
   );
 }
 
-function EmptyState({ title, detail }: { title: string; detail: string }) {
+function EmptyState({
+  title,
+  detail,
+  actionLabel,
+  onAction
+}: {
+  title: string;
+  detail: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
   return (
     <div className="empty-state">
       <Server size={20} />
       <strong>{title}</strong>
       <p>{detail}</p>
+      {actionLabel && onAction ? (
+        <button className="empty-action" type="button" onClick={onAction}>
+          {actionLabel}
+        </button>
+      ) : null}
     </div>
   );
 }

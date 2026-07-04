@@ -937,6 +937,18 @@ h2 {
   line-height: 1.55;
 }
 
+.empty-action {
+  min-height: 34px;
+  margin-top: 4px;
+  padding: 0 12px;
+  border-radius: 8px;
+  color: var(--active-text);
+  background: var(--active-bg);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .node-card {
   min-width: 0;
   min-height: 304px;
