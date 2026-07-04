@@ -314,7 +314,7 @@ function LatticeApp() {
           .includes(needle);
       return statusMatch && queryMatch;
     });
-  }, [filter, query]);
+  }, [filter, nodes, query]);
 
   const resetNodeFilters = () => {
     setQuery("");
