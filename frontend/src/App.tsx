@@ -196,7 +196,7 @@ function LatticeApp() {
     };
 
     void load();
-    const timer = window.setInterval(load, 10000);
+    const timer = window.setInterval(load, 5000);
     return () => {
       active = false;
       controller?.abort();

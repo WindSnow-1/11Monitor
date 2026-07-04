@@ -4,8 +4,8 @@ import os from "node:os";
 
 const apiUrl = env("LATTICE_API_URL", "http://127.0.0.1:8091/api/agent/report");
 const token = env("LATTICE_AGENT_TOKEN", env("AGENT_TOKEN", ""));
-const intervalSeconds = Number(env("LATTICE_AGENT_INTERVAL", "10"));
-const intervalMs = Math.max(5000, (Number.isFinite(intervalSeconds) ? intervalSeconds : 10) * 1000);
+const intervalSeconds = Number(env("LATTICE_AGENT_INTERVAL", "5"));
+const intervalMs = Math.max(5000, (Number.isFinite(intervalSeconds) ? intervalSeconds : 5) * 1000);
 const once = process.argv.includes("--once");
 
 let previousNet = null;

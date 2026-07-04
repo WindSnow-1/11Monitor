@@ -3,13 +3,15 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { createApp } from "../src/server.js";
+import { JsonStore } from "../src/store.js";
 
 const tempDir = await mkdtemp(path.join(os.tmpdir(), "lattice-backend-"));
 const dbPath = path.join(tempDir, "store.json");
 const token = "test-agent-token";
 const adminPassword = "test-admin-password";
+const store = new JsonStore(dbPath);
 const app = createApp({
-  dbPath,
+  store,
   agentToken: token,
   auth: {
     initialPassword: adminPassword,
@@ -116,6 +118,16 @@ try {
 
   const metrics = await getJson("/api/nodes/test-node-01/metrics", cookie);
   assert.equal(metrics.length, 1);
+  assert.ok(metrics[0].createdAt);
+
+  const state = await store.load();
+  state.nodes[0].updatedAt = new Date(Date.now() - 120000).toISOString();
+  await store.save();
+
+  const staleDashboard = await getJson("/api/dashboard", cookie);
+  assert.equal(staleDashboard.counts.offline, 1);
+  assert.equal(staleDashboard.nodes[0].status, "offline");
+  assert.ok(staleDashboard.alerts.some((alert) => alert.id === "offline-test-node-01"));
 
   console.log("smoke ok");
 } finally {

@@ -87,7 +87,7 @@ First login is `admin / admin123456` unless you changed `ADMIN_INITIAL_PASSWORD`
 
 ## 6. Install Local Agent
 
-Install this on the monitor server itself if you want the server to report its own CPU, memory, disk, traffic, and load every 10 seconds.
+Install this on the monitor server itself if you want the server to report its own CPU, memory, disk, traffic, and load every 5 seconds.
 
 Copy the agent service:
 
@@ -115,3 +115,10 @@ Watch one log page:
 ```bash
 journalctl -u lattice-agent -n 20 --no-pager
 ```
+
+Backend retention:
+
+- node metrics are retained for roughly 24 hours at the 5 second interval
+- dashboard responses are sampled so the browser does not receive thousands of chart points
+- nodes become offline after about 90 seconds without an agent report
+- only the latest 100 alerts are retained

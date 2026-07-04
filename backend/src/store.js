@@ -11,6 +11,11 @@ const DEFAULT_SPECS = {
   disk: "unknown",
   bandwidth: "unknown"
 };
+const METRIC_RETENTION_MS = 24 * 60 * 60 * 1000;
+const METRIC_MAX_POINTS = 24 * 60 * 60 / 5;
+const RESPONSE_TREND_POINTS = 240;
+const ALERT_LIMIT = 100;
+const NODE_STALE_MS = 90 * 1000;
 
 export class JsonStore {
   constructor(filePath) {
@@ -23,14 +28,27 @@ export class JsonStore {
 
     try {
       const raw = await readFile(this.filePath, "utf8");
-      this.state = JSON.parse(raw);
+      this.state = this.normalizeState(JSON.parse(raw));
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
-      this.state = createSeedState();
+      this.state = this.normalizeState(createSeedState());
       await this.save();
     }
 
     return this.state;
+  }
+
+  normalizeState(state) {
+    return {
+      version: 1,
+      updatedAt: new Date().toISOString(),
+      ...state,
+      fleetTrend: Array.isArray(state.fleetTrend) ? state.fleetTrend : [],
+      nodes: Array.isArray(state.nodes) ? state.nodes : [],
+      alerts: Array.isArray(state.alerts) ? state.alerts : [],
+      services: Array.isArray(state.services) ? state.services : [],
+      metricsByNode: state.metricsByNode && typeof state.metricsByNode === "object" ? state.metricsByNode : {}
+    };
   }
 
   async save() {
@@ -74,7 +92,7 @@ export class JsonStore {
   }
 
   async dashboard() {
-    const state = await this.load();
+    const state = await this.prepareState();
     const nodes = this.nodesFromState(state);
     const online = nodes.filter((node) => node.status === "online").length;
     const warning = nodes.filter((node) => node.status === "warning").length;
@@ -96,7 +114,7 @@ export class JsonStore {
         { key: "avgPing", label: "平均延迟", value: `${this.averagePing(nodes)} ms`, note: "实时计算" },
         { key: "dailyEgress", label: "今日出站", value: this.totalTraffic(nodes, "tx"), note: "节点累计" }
       ],
-      fleetTrend: state.fleetTrend,
+      fleetTrend: this.samplePoints(state.fleetTrend, RESPONSE_TREND_POINTS),
       nodes,
       services: state.services,
       alerts: state.alerts
@@ -104,7 +122,7 @@ export class JsonStore {
   }
 
   async nodes() {
-    const state = await this.load();
+    const state = await this.prepareState();
     return this.nodesFromState(state);
   }
 
@@ -114,23 +132,23 @@ export class JsonStore {
   }
 
   async metrics(id, limit = 60) {
-    const state = await this.load();
+    const state = await this.prepareState();
     return (state.metricsByNode[id] ?? []).slice(-limit);
   }
 
   async services() {
-    const state = await this.load();
+    const state = await this.prepareState();
     return state.services;
   }
 
   async alerts() {
-    const state = await this.load();
+    const state = await this.prepareState();
     return state.alerts;
   }
 
   async fleetTrend() {
-    const state = await this.load();
-    return state.fleetTrend;
+    const state = await this.prepareState();
+    return this.samplePoints(state.fleetTrend, RESPONSE_TREND_POINTS);
   }
 
   async ingestAgentReport(report) {
@@ -138,11 +156,12 @@ export class JsonStore {
     const normalized = this.normalizeReport(report);
     const existingIndex = state.nodes.findIndex((node) => node.id === normalized.id);
     const previous = existingIndex >= 0 ? state.nodes[existingIndex] : {};
+    const receivedAt = new Date();
     const nextNode = {
       ...previous,
       ...normalized,
       trend: undefined,
-      updatedAt: new Date().toISOString()
+      updatedAt: receivedAt.toISOString()
     };
 
     if (existingIndex >= 0) {
@@ -152,20 +171,22 @@ export class JsonStore {
     }
 
     const point = {
-      time: this.formatTime(report.timestamp),
+      time: this.formatTime(receivedAt),
+      createdAt: receivedAt.toISOString(),
       cpu: nextNode.cpu,
       mem: nextNode.mem,
       net: Number(report.net ?? report.traffic ?? 0),
       ping: nextNode.ping
     };
-    state.metricsByNode[nextNode.id] = [...(state.metricsByNode[nextNode.id] ?? []), point].slice(-288);
+    state.metricsByNode[nextNode.id] = this.trimRetainedPoints([...(state.metricsByNode[nextNode.id] ?? []), point]);
 
     if (Array.isArray(report.services)) {
       this.mergeServices(state, nextNode, report.services);
     }
 
     this.refreshAlerts(state, nextNode);
-    state.fleetTrend = this.recomputeFleetTrend(state);
+    state.fleetTrend = this.trimRetainedPoints(this.recomputeFleetTrend(state, receivedAt));
+    this.pruneRetainedData(state);
     await this.save();
 
     return {
@@ -191,6 +212,15 @@ export class JsonStore {
     return state.auth;
   }
 
+  async prepareState() {
+    const state = await this.load();
+    const livenessChanged = this.refreshNodeLiveness(state);
+    const retentionChanged = this.pruneRetainedData(state);
+    const changed = livenessChanged || retentionChanged;
+    if (changed) await this.save();
+    return state;
+  }
+
   nodesFromState(state) {
     return state.nodes.map((node) => this.withTrend(node, state));
   }
@@ -199,7 +229,7 @@ export class JsonStore {
     return {
       ...node,
       specs: this.normalizeSpecs(node.specs),
-      trend: state.metricsByNode[node.id] ?? node.trend ?? []
+      trend: this.samplePoints(state.metricsByNode[node.id] ?? node.trend ?? [], RESPONSE_TREND_POINTS)
     };
   }
 
@@ -284,7 +314,7 @@ export class JsonStore {
     const time = now.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
 
     if (node.status === "offline") {
-      state.alerts.unshift({
+      this.pushAlert(state, {
         id: `offline-${node.id}`,
         node: node.name,
         nodeId: node.id,
@@ -295,7 +325,7 @@ export class JsonStore {
         createdAt: now.toISOString()
       });
     } else if (node.cpu >= 75) {
-      state.alerts.unshift({
+      this.pushAlert(state, {
         id: `cpu-${node.id}`,
         node: node.name,
         nodeId: node.id,
@@ -306,7 +336,7 @@ export class JsonStore {
         createdAt: now.toISOString()
       });
     } else if (node.disk >= 90) {
-      state.alerts.unshift({
+      this.pushAlert(state, {
         id: `disk-${node.id}`,
         node: node.name,
         nodeId: node.id,
@@ -318,22 +348,103 @@ export class JsonStore {
       });
     }
 
-    state.alerts = state.alerts.slice(0, 50);
+    state.alerts = state.alerts.slice(0, ALERT_LIMIT);
   }
 
-  recomputeFleetTrend(state) {
+  refreshNodeLiveness(state) {
+    let changed = false;
+    const now = Date.now();
+
+    for (const node of state.nodes) {
+      const updatedAt = Date.parse(node.updatedAt ?? "");
+      if (node.status === "offline" || !Number.isFinite(updatedAt) || now - updatedAt <= NODE_STALE_MS) continue;
+
+      node.status = "offline";
+      node.ping = 0;
+      changed = true;
+      state.alerts = state.alerts.filter((alert) => alert.nodeId !== node.id || alert.tone === "info");
+      const time = new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
+      this.pushAlert(state, {
+        id: `offline-${node.id}`,
+        node: node.name,
+        nodeId: node.id,
+        title: "节点离线",
+        detail: "超过 90 秒未收到 Agent 上报",
+        time,
+        tone: "danger",
+        createdAt: new Date().toISOString()
+      });
+
+      for (const service of state.services) {
+        if (service.nodeId === node.id) {
+          service.status = "offline";
+          service.latency = 0;
+        }
+      }
+    }
+
+    return changed;
+  }
+
+  pruneRetainedData(state) {
+    let changed = false;
+
+    for (const [nodeId, points] of Object.entries(state.metricsByNode)) {
+      const next = this.trimRetainedPoints(points);
+      if (next.length !== points.length) {
+        state.metricsByNode[nodeId] = next;
+        changed = true;
+      }
+    }
+
+    const nextFleetTrend = this.trimRetainedPoints(state.fleetTrend);
+    if (nextFleetTrend.length !== state.fleetTrend.length) {
+      state.fleetTrend = nextFleetTrend;
+      changed = true;
+    }
+
+    if (state.alerts.length > ALERT_LIMIT) {
+      state.alerts = state.alerts.slice(0, ALERT_LIMIT);
+      changed = true;
+    }
+
+    return changed;
+  }
+
+  trimRetainedPoints(points) {
+    const cutoff = Date.now() - METRIC_RETENTION_MS;
+    return points.filter((point) => {
+      const createdAt = Date.parse(point.createdAt ?? "");
+      return !Number.isFinite(createdAt) || createdAt >= cutoff;
+    }).slice(-METRIC_MAX_POINTS);
+  }
+
+  samplePoints(points, maxPoints) {
+    if (points.length <= maxPoints) return points;
+    const step = (points.length - 1) / (maxPoints - 1);
+    return Array.from({ length: maxPoints }, (_, index) => points[Math.round(index * step)]);
+  }
+
+  pushAlert(state, alert) {
+    state.alerts = state.alerts.filter((item) => item.id !== alert.id);
+    state.alerts.unshift(alert);
+    state.alerts = state.alerts.slice(0, ALERT_LIMIT);
+  }
+
+  recomputeFleetTrend(state, timestamp = new Date()) {
     const nodes = this.nodesFromState(state).filter((node) => node.status !== "offline");
     if (!nodes.length) return state.fleetTrend;
     const last = nodes.map((node) => node.trend.at(-1)).filter(Boolean);
     if (!last.length) return state.fleetTrend;
     const avg = (key) => Math.round(last.reduce((sum, point) => sum + Number(point[key] ?? 0), 0) / last.length);
     const point = {
-      time: this.formatTime(),
+      time: this.formatTime(timestamp),
+      createdAt: timestamp.toISOString(),
       cpu: avg("cpu"),
       mem: avg("mem"),
       traffic: avg("net")
     };
-    return [...state.fleetTrend, point].slice(-24);
+    return [...state.fleetTrend, point];
   }
 
   averagePing(nodes) {

@@ -8,7 +8,7 @@ Type=simple
 WorkingDirectory=/opt/lattice-monitor
 Environment="LATTICE_API_URL=http://127.0.0.1:8091/api/agent/report"
 Environment="LATTICE_AGENT_TOKEN=change-this-token"
-Environment="LATTICE_AGENT_INTERVAL=10"
+Environment="LATTICE_AGENT_INTERVAL=5"
 Environment="LATTICE_NODE_ID=racknerd-a062afa"
 Environment="LATTICE_NODE_NAME=RackNerd RN"
 Environment="LATTICE_NODE_ROLE=主监控节点"

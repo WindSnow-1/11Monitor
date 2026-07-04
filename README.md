@@ -100,3 +100,11 @@ Example payload:
   "tx": "1.9 TB"
 }
 ```
+
+## Runtime Retention
+
+- The included agent reports every 5 seconds by default.
+- The frontend refreshes dashboard data every 5 seconds.
+- Node metrics and fleet trend points are retained for roughly 24 hours.
+- Nodes are marked offline after about 90 seconds without an agent report.
+- The backend keeps the latest 100 alerts.
