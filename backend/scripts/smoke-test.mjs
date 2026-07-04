@@ -18,12 +18,12 @@ try {
   assert.equal(health.ok, true);
 
   const dashboard = await getJson("/api/dashboard");
-  assert.equal(dashboard.counts.nodes, 6);
+  assert.equal(dashboard.counts.nodes, 0);
   assert.ok(Array.isArray(dashboard.nodes));
   assert.ok(Array.isArray(dashboard.fleetTrend));
 
   const nodes = await getJson("/api/nodes");
-  assert.equal(nodes[0].trend.length > 0, true);
+  assert.equal(nodes.length, 0);
 
   const denied = await fetch(`${base}/api/agent/report`, { method: "POST", body: "{}" });
   assert.equal(denied.status, 401);
@@ -47,6 +47,13 @@ try {
       ping: 4,
       rx: "1 GB",
       tx: "2 GB",
+      specs: {
+        cpuModel: "Smoke CPU",
+        cores: "2 vCPU",
+        memory: "2 GB",
+        disk: "40 GB SSD",
+        bandwidth: "1 Gbps"
+      },
       services: [{ name: "Smoke API", protocol: "HTTP", latency: 4 }]
     })
   });
@@ -55,6 +62,10 @@ try {
   const created = await getJson("/api/nodes/test-node-01");
   assert.equal(created.status, "warning");
   assert.equal(created.cpu, 81);
+  assert.equal(created.specs.memory, "2 GB");
+
+  const nextDashboard = await getJson("/api/dashboard");
+  assert.equal(nextDashboard.counts.nodes, 1);
 
   const metrics = await getJson("/api/nodes/test-node-01/metrics");
   assert.equal(metrics.length, 1);

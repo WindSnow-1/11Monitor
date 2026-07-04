@@ -37,10 +37,7 @@ import {
   YAxis
 } from "recharts";
 import {
-  alerts as fallbackAlerts,
   fleetTrend as fallbackFleetTrend,
-  nodes as fallbackNodes,
-  services as fallbackServices,
   type AlertItem,
   type NodeItem,
   type NodeStatus,
@@ -93,11 +90,11 @@ const defaultSpecs: NodeItem["specs"] = {
   bandwidth: "unknown"
 };
 
-const fallbackDashboard: DashboardData = {
-  fleetTrend: fallbackFleetTrend,
-  nodes: fallbackNodes,
-  services: fallbackServices,
-  alerts: fallbackAlerts
+const emptyDashboard: DashboardData = {
+  fleetTrend: [],
+  nodes: [],
+  services: [],
+  alerts: []
 };
 
 function getInitialTheme(): ThemeMode {
@@ -105,10 +102,10 @@ function getInitialTheme(): ThemeMode {
 }
 
 function LatticeApp() {
-  const [dashboard, setDashboard] = useState<DashboardData>(fallbackDashboard);
+  const [dashboard, setDashboard] = useState<DashboardData>(emptyDashboard);
   const [apiState, setApiState] = useState<ApiState>("fallback");
   const [apiError, setApiError] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState(fallbackNodes[1].id);
+  const [selectedId, setSelectedId] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [mode, setMode] = useState<Mode>("fleet");
   const [view, setView] = useState<View>("overview");
@@ -166,7 +163,7 @@ function LatticeApp() {
       });
   };
 
-  const selected = nodes.find((node) => node.id === selectedId) ?? nodes[0] ?? fallbackNodes[0];
+  const selected = nodes.find((node) => node.id === selectedId) ?? nodes[0] ?? null;
   const onlineCount = nodes.filter((node) => node.status === "online").length;
   const warningCount = nodes.filter((node) => node.status === "warning").length;
   const offlineCount = nodes.filter((node) => node.status === "offline").length;
@@ -245,7 +242,7 @@ function LatticeApp() {
             <p className="eyebrow">NOC / Asia-Shanghai</p>
             <h1>服务器状态调度台</h1>
             <p className={clsx("api-state", apiState)} title={apiError ?? undefined}>
-              {apiState === "live" ? "API 实时数据" : "本地演示数据"}
+              {apiState === "live" ? "API 实时数据" : "等待 Agent 上报"}
             </p>
           </div>
 
@@ -336,22 +333,26 @@ function LatticeApp() {
             <section className="nodes-panel">
               <PanelHeader icon={<Server size={18} />} title="节点矩阵" action={`${filteredNodes.length} 台`} />
               <div className="node-grid">
-                {filteredNodes.map((node) => (
-                  <NodeCard
-                    key={node.id}
-                    node={node}
-                    selected={node.id === selected.id}
-                    onClick={() => setSelectedId(node.id)}
-                  />
-                ))}
+                {filteredNodes.length ? (
+                  filteredNodes.map((node) => (
+                    <NodeCard
+                      key={node.id}
+                      node={node}
+                      selected={node.id === selected?.id}
+                      onClick={() => setSelectedId(node.id)}
+                    />
+                  ))
+                ) : (
+                  <EmptyState title="暂无节点" detail="部署 Agent 后，真实服务器会自动出现在这里。" />
+                )}
               </div>
             </section>
           )}
 
           {(view === "overview" || view === "nodes" || view === "services" || view === "alerts" || view === "security") && (
             <aside className="detail-panel">
-              <PanelHeader icon={<SlidersHorizontal size={18} />} title="焦点节点" action={selected.region} />
-              <NodeDetail node={selected} />
+              <PanelHeader icon={<SlidersHorizontal size={18} />} title="焦点节点" action={selected?.region ?? "等待上报"} />
+              {selected ? <NodeDetail node={selected} /> : <EmptyState title="暂无节点" detail="安装 Agent 并上报后，这里会显示真实机器详情。" />}
             </aside>
           )}
 
@@ -359,22 +360,26 @@ function LatticeApp() {
             <section className="services-panel">
               <PanelHeader icon={<Activity size={18} />} title="服务探测" action="HTTP / TCP" />
               <div className="service-list">
-                {services.map((service) => (
-                  <button
-                    className={clsx("service-row", service.node === selected.name && "selected")}
-                    key={service.id ?? service.name}
-                    onClick={() => selectNodeByName(service.node)}
-                    type="button"
-                  >
-                    <StatusDot status={service.status} />
-                    <div>
-                      <strong>{service.name}</strong>
-                      <span>{service.node}</span>
-                    </div>
-                    <span>{service.protocol}</span>
-                    <strong>{service.latency ? `${service.latency} ms` : "超时"}</strong>
-                  </button>
-                ))}
+                {services.length ? (
+                  services.map((service) => (
+                    <button
+                      className={clsx("service-row", service.node === selected?.name && "selected")}
+                      key={service.id ?? service.name}
+                      onClick={() => selectNodeByName(service.node)}
+                      type="button"
+                    >
+                      <StatusDot status={service.status} />
+                      <div>
+                        <strong>{service.name}</strong>
+                        <span>{service.node}</span>
+                      </div>
+                      <span>{service.protocol}</span>
+                      <strong>{service.latency ? `${service.latency} ms` : "超时"}</strong>
+                    </button>
+                  ))
+                ) : (
+                  <EmptyState title="暂无服务探测" detail="Agent 上报服务后，这里会显示 HTTP/TCP 状态。" />
+                )}
               </div>
             </section>
           )}
@@ -393,20 +398,24 @@ function LatticeApp() {
             <aside className="alerts-panel">
               <PanelHeader icon={<Bell size={18} />} title="事件流" action="刚刚" />
               <div className="alert-list">
-                {alerts.map((alert) => (
-                  <button
-                    className={clsx("alert-row", alert.tone, alert.node === selected.name && "selected")}
-                    key={alert.id}
-                    onClick={() => selectNodeByName(alert.node)}
-                    type="button"
-                  >
-                    <span>{alert.time}</span>
-                    <div>
-                      <strong>{alert.title}</strong>
-                      <p>{alert.node} · {alert.detail}</p>
-                    </div>
-                  </button>
-                ))}
+                {alerts.length ? (
+                  alerts.map((alert) => (
+                    <button
+                      className={clsx("alert-row", alert.tone, alert.node === selected?.name && "selected")}
+                      key={alert.id}
+                      onClick={() => selectNodeByName(alert.node)}
+                      type="button"
+                    >
+                      <span>{alert.time}</span>
+                      <div>
+                        <strong>{alert.title}</strong>
+                        <p>{alert.node} · {alert.detail}</p>
+                      </div>
+                    </button>
+                  ))
+                ) : (
+                  <EmptyState title="暂无事件" detail="异常、离线和恢复事件会出现在这里。" />
+                )}
               </div>
             </aside>
           )}
@@ -429,7 +438,7 @@ async function fetchDashboard(signal?: AbortSignal): Promise<DashboardData> {
   const payload = (await response.json()) as DashboardData;
   return {
     ...payload,
-    fleetTrend: payload.fleetTrend ?? fallbackFleetTrend,
+    fleetTrend: payload.fleetTrend ?? [],
     nodes: (payload.nodes ?? []).map(withNodeDefaults),
     services: payload.services ?? [],
     alerts: payload.alerts ?? []
@@ -551,7 +560,7 @@ function SecurityPanel({
   offlineCount,
   totalNodes
 }: {
-  selected: NodeItem;
+  selected: NodeItem | null;
   onlineCount: number;
   warningCount: number;
   offlineCount: number;
@@ -586,12 +595,21 @@ function SecurityPanel({
             value="关闭"
             note="前端和后端都不提供远程命令通道"
           />
-          <SecurityCheck
-            tone={selected.status}
-            label={`${selected.name} 探针`}
-            value={selected.status === "offline" ? "心跳断开" : "心跳正常"}
-            note={`${selected.region} · ${selected.ip}`}
-          />
+          {selected ? (
+            <SecurityCheck
+              tone={selected.status}
+              label={`${selected.name} 探针`}
+              value={selected.status === "offline" ? "心跳断开" : "心跳正常"}
+              note={`${selected.region} · ${selected.ip}`}
+            />
+          ) : (
+            <SecurityCheck
+              tone="offline"
+              label="暂无探针"
+              value="等待上报"
+              note="安装 Agent 后自动出现在这里"
+            />
+          )}
           <SecurityCheck
             tone={warningCount ? "warning" : "online"}
             label="压力告警"
@@ -633,25 +651,29 @@ function SecurityCheck({
   );
 }
 
-function Topology({ nodes, selected, onSelect }: { nodes: NodeItem[]; selected: NodeItem; onSelect: (id: string) => void }) {
+function Topology({ nodes, selected, onSelect }: { nodes: NodeItem[]; selected: NodeItem | null; onSelect: (id: string) => void }) {
   return (
     <div className="topology">
       <div className="topology-core">
         <Network size={26} />
         <strong>CORE</strong>
       </div>
-      {nodes.map((node, index) => (
-        <button
-          key={node.id}
-          className={clsx("topology-node", node.status, selected.id === node.id && "selected")}
-          style={{ "--i": index } as React.CSSProperties}
-          onClick={() => onSelect(node.id)}
-          title={node.name}
-        >
-          <StatusDot status={node.status} />
-          <span>{node.region}</span>
-        </button>
-      ))}
+      {nodes.length ? (
+        nodes.map((node, index) => (
+          <button
+            key={node.id}
+            className={clsx("topology-node", node.status, selected?.id === node.id && "selected")}
+            style={{ "--i": index } as React.CSSProperties}
+            onClick={() => onSelect(node.id)}
+            title={node.name}
+          >
+            <StatusDot status={node.status} />
+            <span>{node.region}</span>
+          </button>
+        ))
+      ) : (
+        <div className="topology-empty">等待 Agent 上报</div>
+      )}
     </div>
   );
 }
@@ -781,6 +803,16 @@ function MachineSpecs({ node }: { node: NodeItem }) {
         </article>
       ))}
     </section>
+  );
+}
+
+function EmptyState({ title, detail }: { title: string; detail: string }) {
+  return (
+    <div className="empty-state">
+      <Server size={20} />
+      <strong>{title}</strong>
+      <p>{detail}</p>
+    </div>
   );
 }
 

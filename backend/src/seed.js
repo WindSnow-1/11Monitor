@@ -268,13 +268,16 @@ export const services = [
 ];
 
 export function createSeedState() {
+  const demoEnabled = process.env.LATTICE_DEMO_DATA === "true";
+  const seedNodes = demoEnabled ? nodes : [];
+
   return {
     version: 1,
     updatedAt: new Date().toISOString(),
-    fleetTrend,
-    nodes,
-    alerts,
-    services,
-    metricsByNode: Object.fromEntries(nodes.map((node) => [node.id, node.trend]))
+    fleetTrend: demoEnabled ? fleetTrend : [],
+    nodes: seedNodes,
+    alerts: demoEnabled ? alerts : [],
+    services: demoEnabled ? services : [],
+    metricsByNode: Object.fromEntries(seedNodes.map((node) => [node.id, node.trend]))
   };
 }

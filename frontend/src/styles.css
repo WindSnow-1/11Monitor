@@ -645,6 +645,21 @@ h2 {
   color: var(--muted);
 }
 
+.topology-empty {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 62px);
+  z-index: 3;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  background: var(--topology-node-bg);
+  font-size: 12px;
+  font-weight: 800;
+  transform: translateX(-50%);
+}
+
 .fleet-chart {
   padding: 14px 12px 10px;
 }
@@ -654,6 +669,40 @@ h2 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   padding: 12px;
+}
+
+.empty-state {
+  min-height: 168px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  padding: 18px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 8px;
+  color: var(--muted);
+  background: var(--panel-soft);
+  text-align: center;
+}
+
+.node-grid > .empty-state {
+  grid-column: 1 / -1;
+}
+
+.empty-state svg {
+  color: var(--mint);
+}
+
+.empty-state strong {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.empty-state p {
+  max-width: 300px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 .node-card {
