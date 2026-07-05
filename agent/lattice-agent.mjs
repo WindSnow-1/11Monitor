@@ -9,6 +9,7 @@ const intervalMs = Math.max(5000, (Number.isFinite(intervalSeconds) ? intervalSe
 const once = process.argv.includes("--once");
 
 let previousNet = null;
+let previousCpu = null;
 let previousAt = Date.now();
 let lastPostMs = 1;
 
@@ -29,8 +30,8 @@ if (once) {
 }
 
 async function reportOnce() {
-  const started = Date.now();
   const payload = await collectPayload();
+  const postStarted = Date.now();
   const response = await fetch(apiUrl, {
     method: "POST",
     headers: {
@@ -41,7 +42,7 @@ async function reportOnce() {
   });
 
   const text = await response.text();
-  lastPostMs = Math.max(1, Date.now() - started);
+  lastPostMs = Math.max(1, Date.now() - postStarted);
   if (!response.ok) {
     throw new Error(`report failed ${response.status}: ${text}`);
   }
@@ -91,16 +92,29 @@ async function collectPayload() {
 
 async function cpuUsage() {
   try {
-    const first = await readCpuStat();
-    await sleep(700);
-    const second = await readCpuStat();
-    const idle = second.idle - first.idle;
-    const total = second.total - first.total;
-    if (total <= 0) return 0;
-    return clampPercent((1 - idle / total) * 100);
+    const current = await readCpuStat();
+    if (!previousCpu) {
+      previousCpu = current;
+      await sleep(250);
+      const sampled = await readCpuStat();
+      const usage = cpuPercentBetween(previousCpu, sampled);
+      previousCpu = sampled;
+      return usage;
+    }
+
+    const usage = cpuPercentBetween(previousCpu, current);
+    previousCpu = current;
+    return usage;
   } catch {
     return clampPercent(os.loadavg()[0] * 50);
   }
+}
+
+function cpuPercentBetween(first, second) {
+  const idle = second.idle - first.idle;
+  const total = second.total - first.total;
+  if (total <= 0) return 0;
+  return clampPercent((1 - idle / total) * 100);
 }
 
 async function readCpuStat() {

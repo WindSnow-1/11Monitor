@@ -111,7 +111,7 @@ export class JsonStore {
       tiles: [
         { key: "onlineNodes", label: "在线节点", value: `${online}/${nodes.length}`, note: `${warning} 个注意` },
         { key: "activeAlerts", label: "活跃告警", value: String(state.alerts.length), note: `${offline} 个离线` },
-        { key: "avgPing", label: "平均延迟", value: `${this.averagePing(nodes)} ms`, note: "实时计算" },
+        { key: "avgPing", label: "上报耗时", value: `${this.averagePing(nodes)} ms`, note: "Agent 到后端" },
         { key: "dailyEgress", label: "今日出站", value: this.totalTraffic(nodes, "tx"), note: "节点累计" }
       ],
       fleetTrend: this.samplePoints(state.fleetTrend, RESPONSE_TREND_POINTS),

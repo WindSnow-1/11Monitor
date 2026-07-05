@@ -434,7 +434,7 @@ function LatticeApp() {
         <section className="metrics-grid" aria-label="核心指标">
           <MetricTile icon={<Server size={19} />} label="在线节点" value={tileValue("onlineNodes", `${onlineCount}/${nodes.length}`)} accent="mint" note={tileNote("onlineNodes", `${warningCount} 个注意`)} />
           <MetricTile icon={<AlertTriangle size={19} />} label="活跃告警" value={tileValue("activeAlerts", String(alerts.length))} accent="amber" note={tileNote("activeAlerts", `${offlineCount} 个离线`)} />
-          <MetricTile icon={<Wifi size={19} />} label="平均延迟" value={tileValue("avgPing", "0 ms")} accent="cyan" note={tileNote("avgPing", "实时计算")} />
+          <MetricTile icon={<Wifi size={19} />} label="上报耗时" value={tileValue("avgPing", "0 ms")} accent="cyan" note={tileNote("avgPing", "Agent 到后端")} />
           <MetricTile icon={<Database size={19} />} label="今日出站" value={tileValue("dailyEgress", "0 GB")} accent="coral" note={tileNote("dailyEgress", "节点累计")} />
         </section>
 
@@ -1119,7 +1119,7 @@ function NodeDetail({ node }: { node: NodeItem }) {
         <SmallStat icon={<Cpu size={17} />} label="CPU" value={`${node.cpu}%`} />
         <SmallStat icon={<HardDrive size={17} />} label="磁盘" value={`${node.disk}%`} />
         <SmallStat icon={<ThermometerSun size={17} />} label="温度" value={node.temp ? `${node.temp}C` : "n/a"} />
-        <SmallStat icon={<Wifi size={17} />} label="延迟" value={node.ping ? `${node.ping}ms` : "n/a"} />
+        <SmallStat icon={<Wifi size={17} />} label="上报" value={node.ping ? `${node.ping}ms` : "n/a"} />
       </div>
 
       <MachineSpecs node={node} />
