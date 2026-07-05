@@ -120,7 +120,8 @@ function cpuPercentBetween(first, second) {
 async function readCpuStat() {
   const line = (await readFile("/proc/stat", "utf8")).split("\n")[0];
   const values = line.trim().split(/\s+/).slice(1).map(Number);
-  const idle = (values[3] ?? 0) + (values[4] ?? 0);
+  // Count iowait as pressure so the dashboard matches common VPS panels during disk-heavy work.
+  const idle = values[3] ?? 0;
   const total = values.reduce((sum, value) => sum + value, 0);
   return { idle, total };
 }
